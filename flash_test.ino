@@ -121,7 +121,6 @@ void listDir(fs::FS& fs, const char* dirname, uint8_t outshoot) {
       for (int i = 0; i < outshoot; i++) {
         Serial.println("  ");
       }
-      //Serial.print("  DIR : ");
       Serial.println(file.name());
       Serial.println("\n");
 
