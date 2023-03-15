@@ -17,7 +17,7 @@ const esp_partition_t* Partition;
 
 
 const esp_partition_t* partition(){
-  // Return the first SPIFFS partition found (should be the only one)
+  // Return the first FAT partition found (should be the only one)
   return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, NULL);
 }
 
@@ -53,54 +53,69 @@ void setup(){
 
   Serial.println("Starting Serial");
 
-
-  Serial.println("Getting partition info");
-  // Get partition information
-  Partition = partition();
-
-
-  Serial.println("Initializing MSC");
-  // Initialize USB metadata and callbacks for MSC (Mass Storage Class)
-  msc.vendorID("ESP32");
-  msc.productID("USB_MSC");
-  msc.productRevision("1.0");
-  msc.onRead(onRead);
-  msc.onWrite(onWrite);
-  msc.onStartStop(onStartStop);
-  msc.mediaPresent(true);
-  msc.begin(Partition->size/BLOCK_SIZE, BLOCK_SIZE);
-
-  Serial.println("Initializing USB");
-
-  USB.begin();
-
-
   Serial.println("Initializing FFat");
 
-  // begin(true) will format on fail
-  if(!FFat.begin(true)){
-    Serial.println("Mount Failed");
-  }else{
-    Serial.println("fat succsess");
+  // False for the msc mode and True for internal filesystem mode
+  // Since both cannot write to the same table at the same time
+  if(false){
+    // begin(true) will format on fail
+    if(!FFat.begin(true)){
+      Serial.println("Mount Failed");
+    }else{
+      Serial.println("fat succsess");
+    }
+
+    Serial.println("Listing before");
+
+    listDir(FFat, "/", 0);
+
+    Serial.println("Creating file");
+    // Create a file
+    File f = FFat.open("/test.txt", FILE_WRITE, true);
+
+    // Write to file
+    f.println("Test");
+
+    // Close and flush file (Not sure if flush is needed, but there to be safe)
+    f.flush();
+    f.close();
+
+    Serial.println("Listing After");
+
+    // Print directory contents
+    listDir(FFat, "/", 0);
+    
+  } else {
+    Serial.println("Getting partition info");
+    // Get partition information
+    Partition = partition();
+
+    Serial.println("Initializing MSC");
+    // Initialize USB metadata and callbacks for MSC (Mass Storage Class)
+    msc.vendorID("ESP32");
+    msc.productID("USB_MSC");
+    msc.productRevision("1.0");
+    msc.onRead(onRead);
+    msc.onWrite(onWrite);
+    msc.onStartStop(onStartStop);
+    msc.mediaPresent(true);
+    msc.begin(Partition->size/BLOCK_SIZE, BLOCK_SIZE);
+
+    Serial.println("Initializing USB");
+
+    USB.begin();
+
+    Serial.println("Printing flash size");
+
+    //Print flash size
+    char buff[50];
+    sprintf(buff, "Flash Size: %d", Partition->size);
+    Serial.println(buff);
   }
-
-  // Windows will format the flash as FAT filesystem if it is not already formatted
-
-  Serial.println("Listing files");
-
-  // Print directory contents
-  listDir(FFat, "/", 0);
-
-  Serial.println("Printing flash size");
-
-  // Print flash size
-  char buff[50];
-  sprintf(buff, "Flash Size: %d", Partition->size);
-  Serial.println(buff);
 }
 
 void loop(){
-  delay(2000);
+  delay(5000);
 }
 
 
