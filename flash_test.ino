@@ -6,6 +6,7 @@
 // Block size of flash memory (in bytes) (4KB)
 #define BLOCK_SIZE 4096
 
+
 // USB Mass Storage Class (MSC) object
 USBMSC msc;
 
@@ -14,6 +15,9 @@ EspClass _flash;
 
 // Partition information object
 const esp_partition_t* Partition;
+
+
+void listDir(fs::FS& fs, const char* dirname, int numTabs = 0);
 
 
 const esp_partition_t* partition(){
@@ -57,24 +61,33 @@ void setup(){
 
   // False for the msc mode and True for internal filesystem mode
   // Since both cannot write to the same table at the same time
-  if(false){
-    // begin(true) will format on fail
-    if(!FFat.begin(true)){
-      Serial.println("Mount Failed");
+  if (true){
+
+    // begin(true) will format on fail 
+    if(!FFat.begin()){
+      Serial.println("Mount Failed, formatting...");
+
+      // If mount fails, format the partition (Feels cleaner than FFat.begin(true))
+      if(FFat.format(FFAT_WIPE_FULL)){
+        Serial.println("Format Success");
+      } else {
+        Serial.println("Format Failed");
+      }
     }else{
-      Serial.println("fat succsess");
+      Serial.println("fat success");
     }
 
     Serial.println("Listing before");
 
-    listDir(FFat, "/", 0);
+    listDir(FFat, "/");
 
     Serial.println("Creating file");
-    // Create a file
-    File f = FFat.open("/test.txt", FILE_WRITE, true);
 
-    // Write to file
-    f.println("Test");
+    // Create a file | use F("...") on file paths or it creates weird problems (idk why)
+    File f = FFat.open(F("/test.txt"), FILE_WRITE, true);
+
+    // Write to file (using F("...") here just to be safe) 
+    f.println(F("Test"));
 
     // Close and flush file (Not sure if flush is needed, but there to be safe)
     f.flush();
@@ -83,7 +96,8 @@ void setup(){
     Serial.println("Listing After");
 
     // Print directory contents
-    listDir(FFat, "/", 0);
+    listDir(FFat, "/");
+
     
   } else {
     Serial.println("Getting partition info");
@@ -119,33 +133,38 @@ void loop(){
 }
 
 
-void listDir(fs::FS& fs, const char* dirname, uint8_t outshoot) {
-  File root = fs.open(dirname);
-  if (!root) {
-    Serial.println("Failed to open directory");
+void listDir(fs::FS& fs, const char* dirname, int numTabs) {
+  File dir = fs.open(F(dirname));
+
+  if(!dir){
+    Serial.print("Failed to open directory: ");
+    Serial.println(dirname);
     return;
   }
-  if (!root.isDirectory()) {
+  if(!dir.isDirectory()){
     Serial.println("Not a directory");
     return;
   }
 
-  File file = root.openNextFile();
-  while (file) {
-    if (file.isDirectory()) {
-      for (int i = 0; i < outshoot; i++) {
-        Serial.println("  ");
-      }
-      Serial.println(file.name());
-      Serial.println("\n");
-
-    } else {
-      for (int i = 0; i < outshoot; i++) {
-        Serial.println("  ");
-      }
-      Serial.println(file.name());
-      Serial.println("\n");
+  while (true) {
+    File file =  dir.openNextFile();
+    if (!file) {
+      // no more files
+      break;
     }
-    file = root.openNextFile();
+    for (uint8_t i = 0; i < numTabs; i++) {
+      Serial.print('\t');
+    }
+    Serial.print(file.name());
+    if (file.isDirectory()) {
+      Serial.println("/");
+      // Ugly string concatenation to get the full path
+      listDir(fs, ((std::string)"/" + (std::string)file.name()).c_str(), numTabs + 1);
+    } else {
+      // files have sizes, directories do not
+      Serial.print("\t\t\tSize: ");
+      Serial.println(file.size(), DEC);
+    }
+    file.close();
   }
 }
